@@ -15,3 +15,32 @@ Después de eso, cuando corra la app va a ver en consola:
 🖥️  GPU detectada: NVIDIA RTX PRO 500
 📊  Compute Capability: 10.0 | CUDA (PyTorch): 12.6
 Y si todavía hay problema (porque CUDA 12.6 no está instalado en el sistema), el nuevo código lo detecta y le da la instrucción exacta en vez de crashear.
+
+
+
+
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+Nota: El requirements.txt incluye PyTorch con soporte CUDA (cu121). 
+Si no se tiene GPU NVIDIA, se puede instalar la versión CPU con:
+pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cpu
+y luego instalar el resto: pip install -r requirements.txt (omitiendo los paquetes de torch ya instalados).
+
+4. Configurar variables de entorno
+
+copy .env.example .env
+Editá .env y reemplazá los valores:
+
+GEMINI_API_KEY → tu clave de Google Gemini
+HF_TOKEN → tu token de Hugging Face
+Los demás campos institucionales según corresponda
+5. (Opcional) Instalar modelo spaCy para detección de nombres
+
+python -m spacy download es_core_news_sm
+Comandos disponibles
+Comando	Descripción
+npm run transcribir	Procesa audios y genera transcripciones
+npm run generar-acta	Genera un acta a partir de una transcripción
+npm run corregir-transcripcion -- ruta/archivo.txt	Corrige una transcripción
+npm run start-server	Inicia el servidor web
