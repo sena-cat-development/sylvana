@@ -1,0 +1,17 @@
+ Blackwell
+
+1. Reinstalar PyTorch con soporte Blackwell:
+
+
+pip uninstall torch torchaudio torchvision -y
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu126
+2. Reinstalar ctranslate2 (WhisperX lo usa internamente):
+
+
+pip install ctranslate2 --upgrade
+Después de eso, cuando corra la app va a ver en consola:
+
+
+🖥️  GPU detectada: NVIDIA RTX PRO 500
+📊  Compute Capability: 10.0 | CUDA (PyTorch): 12.6
+Y si todavía hay problema (porque CUDA 12.6 no está instalado en el sistema), el nuevo código lo detecta y le da la instrucción exacta en vez de crashear.
