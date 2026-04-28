@@ -1,5 +1,5 @@
 {
-  "modelo": "medium",
+  "modelo": "auto",
   "idioma": "es", 
   "device": "auto",
   "compute_type": "auto",

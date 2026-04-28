@@ -51,14 +51,16 @@ async function transcribirUnaParte(
         ['-u', scriptPythonTranscribir, archivoParteInfo.rutaCompleta, ...argumentosExtraPython],
         {
           cwd: directorioDelProyecto,
-          stdio: ['ignore', 'pipe', 'pipe']
+          stdio: ['ignore', 'pipe', 'pipe'],
+          env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' }
         }
       );
 
+      const timeoutMinutos = parseInt(process.env.TRANSCRIPTION_TIMEOUT, 10) || 180;
       const timeoutId = setTimeout(() => {
         subproceso.kill('SIGKILL');
-        rechazar(new Error('Timeout: la transcripción tardó más de 20 minutos'));
-      }, 20 * 60 * 1000);
+        rechazar(new Error(`Timeout: la transcripción tardó más de ${timeoutMinutos} minutos`));
+      }, timeoutMinutos * 60 * 1000);
 
       if (onProgress) onProgress('0');
 

@@ -249,7 +249,6 @@ python -m spacy download es_core_news_sm
 > **Si este comando da error `"No module named spacy"`:** Asegurate de que el entorno virtual esté activado (debe aparecer `(venv)` en la terminal). Ejecutá `venv\Scripts\activate` y volvé a intentar.
 >
 > **Si no querés instalar spaCy:** El sistema funciona igual, pero usará una heurística con expresiones regulares para detectar nombres (menos precisa).
-
 ---
 
 ## Paso 7 — Verificar la instalación

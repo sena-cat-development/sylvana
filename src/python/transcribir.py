@@ -93,6 +93,14 @@ def parse_args() -> argparse.Namespace:
 def setup_environment(args: argparse.Namespace) -> Tuple[Optional[str], str]:
     """Configura variables de entorno y selecciona el dispositivo."""
 
+    # Configurar codificación UTF-8 antes de cualquier print con emojis
+    os.environ["PYTHONIOENCODING"] = "utf-8"
+    try:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
     quiet_env = os.getenv("QUIET_MODE", "").lower() not in ("", "0", "false", "no")
     if args.quiet or quiet_env:
         builtins.print = lambda *a, **k: None  # noqa: WPS121
@@ -104,10 +112,6 @@ def setup_environment(args: argparse.Namespace) -> Tuple[Optional[str], str]:
 
     device_solicitado = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
     device = validar_gpu() if device_solicitado == "cuda" else device_solicitado
-
-    os.environ["PYTHONIOENCODING"] = "utf-8"
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
     warnings.filterwarnings("ignore", category=UserWarning)
     warnings.filterwarnings("ignore", category=FutureWarning)
@@ -175,15 +179,65 @@ def calcular_batch_size_optimo(device: str) -> int:
 
 
 def calcular_compute_type_optimo(device: str) -> str:
-    """Selecciona el compute_type más eficiente según la arquitectura de la GPU."""
+    """Selecciona el compute_type más eficiente según la arquitectura de la GPU.
+
+    - CPU → int8
+    - Pascal (CC 6.x) → int8 (int8_float16 no soportado por ctranslate2)
+    - Volta+ (CC 7.0+) → float16 (el más eficiente)
+    """
     if device != "cuda":
         return "int8"
     try:
         cap_mayor, _ = torch.cuda.get_device_capability(0)
-        # Volta (7.0+) soporta float16 eficiente; antes mejor int8_float16
-        return "float16" if cap_mayor >= 7 else "int8_float16"
+        if cap_mayor >= 7:
+            return "float16"
+        # Pascal y anteriores: int8 puro (int8_float16 falla en ctranslate2)
+        return "int8"
     except Exception:
-        return "float16"
+        return "int8"
+
+
+def calcular_modelo_optimo(device: str) -> str:
+    """Selecciona el modelo Whisper según la VRAM disponible.
+
+    El usuario puede forzar un modelo vía:
+      - Variable de entorno WHISPER_MODEL
+      - Clave 'modelo' en config_transcritor.json (valor 'auto' para auto-detectar)
+    Si ambos dicen 'auto' o no están, se elige según VRAM.
+    """
+    modelos_validos = {"tiny", "base", "small", "medium", "large-v3", "large", "large-v2"}
+
+    # 1) Variable de entorno tiene prioridad
+    modelo_env = os.getenv("WHISPER_MODEL", "").strip().lower()
+    if modelo_env and modelo_env != "auto" and modelo_env in modelos_validos:
+        return modelo_env
+
+    # 2) Config JSON
+    config = cargar_config()
+    modelo_cfg = str(config.get("modelo", "auto")).strip().lower()
+    if modelo_cfg != "auto" and modelo_cfg in modelos_validos:
+        return modelo_cfg
+
+    # 3) Auto-detección según VRAM
+    if device != "cuda":
+        print("📦 Modelo auto: CPU detectada → usando 'base'")
+        return "base"
+
+    try:
+        vram_gb = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
+        if vram_gb < 4:
+            modelo = "base"
+        elif vram_gb < 8:
+            modelo = "small"
+        elif vram_gb < 16:
+            modelo = "medium"
+        else:
+            modelo = "large-v3"
+        print(f"📦 Modelo auto: {vram_gb:.1f} GB VRAM → '{modelo}'")
+        return modelo
+    except Exception:
+        print("📦 Modelo auto: error detectando VRAM → usando 'base'")
+        return "base"
 
 
 def _ajustar_tipo_computo(device: str, compute_type: str) -> str:
@@ -205,21 +259,19 @@ def ejecutar_transcripcion(
     device: str,
     batch_size: int,
     compute_type: str,
+    nombre_modelo: str = "base",
 ):
     """Realiza la transcripción y la alineación de palabras."""
 
     print(f"📁 ¡Perfecto! Encontré el archivo: {audio_file}")
-    print("🤖 Cargando el modelo WhisperX...")
-    print(" Esto puede tardar un poco la primera vez...")
+    print(f"🤖 Cargando el modelo WhisperX ({nombre_modelo})...")
+    print("⏳ Esto puede tardar un poco la primera vez...")
 
     if device == "cuda":
         torch.backends.cudnn.benchmark = True
         torch.set_float32_matmul_precision("high")
 
     compute_type_ajustado = _ajustar_tipo_computo(device, compute_type)
-
-    config = cargar_config()
-    nombre_modelo = config.get("modelo", "large")
     try:
         modelo_whisper = whisperx.load_model(nombre_modelo, device, compute_type=compute_type_ajustado)
     except ValueError as exc:
@@ -538,6 +590,7 @@ def main() -> None:
     nombre_sin_extension = audio_file.rsplit(".", 1)[0]
     avanzar(10)
 
+    nombre_modelo = calcular_modelo_optimo(device)
     batch_size = (
         args.batch_size
         or int(os.getenv("BATCH_SIZE", 0))
@@ -548,11 +601,11 @@ def main() -> None:
         or os.getenv("COMPUTE_TYPE")
         or calcular_compute_type_optimo(device)
     )
-    print(f"⚙️  batch_size={batch_size} | compute_type={compute_type} | device={device}")
+    print(f"📦  modelo={nombre_modelo} | batch_size={batch_size} | compute_type={compute_type} | device={device}")
 
     tiempo_inicio = time.time()
     modelo_whisper, resultado = ejecutar_transcripcion(
-        audio_file, device, batch_size, compute_type
+        audio_file, device, batch_size, compute_type, nombre_modelo
     )
     resultado, segmentos_hablantes = ejecutar_diarizacion(
         resultado, audio_file, device, token_hf

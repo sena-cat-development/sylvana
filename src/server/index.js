@@ -168,7 +168,7 @@ router.get('/descargar', (req, res) => {
   if (!fs.existsSync(ruta)) {
     return res.status(404).json({ error: 'Archivo no encontrado' });
   }
-  res.download(ruta, (err) => {
+  res.download(ruta, { dotfiles: 'allow' }, (err) => {
     if (err) console.error('Error al enviar archivo:', err);
   });
 });

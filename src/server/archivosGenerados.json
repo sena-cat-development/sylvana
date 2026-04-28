@@ -1,1 +1,13 @@
-{}
+{
+  "f277d0a7-d00a-418c-acc7-125030c25494": {
+    "rutas": {
+      "txt": "transcripciones\\b9b9637f38fee6716713429f72e01e72\\b9b9637f38fee6716713429f72e01e72_transcripcion.txt",
+      "md": ".actas_gemini\\versiones\\b9b9637f38fee6716713429f72e01e72\\b9b9637f38fee6716713429f72e01e72_2026-04-28.md",
+      "docx": ".actas_gemini\\versiones\\b9b9637f38fee6716713429f72e01e72\\b9b9637f38fee6716713429f72e01e72_acta_completa.docx"
+    },
+    "meta": {
+      "nombre": "FICHA 3313489.m4a",
+      "fecha": 1777342314407
+    }
+  }
+}
